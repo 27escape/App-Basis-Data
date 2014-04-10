@@ -1,0 +1,55 @@
+#!/usr/bin/env perl
+# PODNAME: app-basis-data test dbi
+# ABSTRACT: Test the App::Basis::Data DBI module
+
+
+# (c) kevin Mulholland 2014, moodfarm@cpan.org
+# this code is released under the Perl Artistic License
+# extra info at http://support.torch.sh/help/kb/graylog2-server/using-the-gelf-http-input
+
+use 5.10.0;
+use strict;
+use warnings;
+use POSIX qw( strftime);
+use Data::Printer;
+use App::Basis;
+
+use Test::More tests => 2;
+
+
+BEGIN { use_ok('App::Basis:Data'); }
+
+
+# -----------------------------------------------------------------------------
+
+
+my $id = $store->add( tag => 'test', message => 'testing', level => 'debug', counter => 20) ;
+my $test_data = $store->tagsearch( tag => 'test', from => '2014-01-01') ;
+my $large_count_data = $store->wildsearch( counter => { 'gte' => 100} ) ; # or '>='
+my $test_count = $store->tagcount(tag => 'test') ;
+my $data = $store->data( $id) ;
+$data->{counter} = 50 ;
+my $new_id = $store->replace( id=> $id, $data) ;
+say ( $id == $new_id) ? "Data replaced" : "data ccreated" ;
+$store->delete( $id) ;
+
+
+SKIP: {
+
+    if ( $ENV{AUTHOR_TESTING} ) {
+
+        subtest 'authors_own' => sub {
+            plan tests => 1;
+            
+
+        };
+    }
+    else {
+        subtest 'not_author' => sub {
+            plan tests => 1;
+        };
+    }
+}
+
+# -----------------------------------------------------------------------------
+# all done
