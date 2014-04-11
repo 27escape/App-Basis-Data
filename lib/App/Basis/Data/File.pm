@@ -17,7 +17,7 @@ App::Basis::Data::File
   my $data = $store->data( $id) ;
   $data->{counter} = 50 ;
   my $new_id = $store->replace( id=> $id, $data) ;
-  say ( $id == $new_id) ? "Data replaced" : "data ccreated" ;
+  say ( $id == $new_id) ? "Data replaced" : "data created" ;
   $store->delete( $id) ;
 
 =head1 DESCRIPTION
@@ -42,14 +42,13 @@ You should not use this class directly, it should be called via L<App::Basis::Da
 
 package App::Basis::Data::File;
 
+use 5.10.0;
 use strict;
 use warnings;
 use Data::Printer;
 use Try::Tiny;
 use Moo;
 use Path::Tiny;
-use Sereal;
-use JSON;
 use namespace::clean;
 
 # -----------------------------------------------------------------------------
@@ -75,17 +74,46 @@ has sri       => ( is => 'ro', required => 1 );
 has _dir      => ( is => 'ro', init_arg => undef, default => sub { } );
 has _settings => ( is => 'ro', init_arg => undef, default => sub { } );
 
-# has _encoder  => ( is => 'ro', init_arg => undef, default => sub { Sereal::Encoder->new(); } );
-# has _decoder  => ( is => 'ro', init_arg => undef, default => sub { Sereal::Decoder->new(); } );
-has _encoder => ( is => 'ro', init_arg => undef, default => sub { JSON->new->allow_nonref; } );
-has _decoder => ( is => 'ro', init_arg => undef, default => sub { JSON->new->allow_nonref; } );
+has _encoder => ( is => 'ro', init_arg => undef, default => sub {undef} );
+has _decoder => ( is => 'ro', init_arg => undef, default => sub {undef} );
+has encoder => ( is => 'ro', default => sub {'json'} );
+
+# -----------------------------------------------------------------------------
+# _store
+# consistent way to store, even if the extra call slows us down
+# we add on the we use the encoder name as
+# a file extension to make sure we can have multiple formats in one tree
+sub _store
+{
+    my $self = shift;
+    my ( $path, $data ) = @_;
+
+    # make the directory for the file to live in
+    $path .= ".$self->{encoder}" if ( $path !~ /\.$self->{encoder}$/ );
+    path( path($path)->dirname )->mkpath;    # will die if any issues
+    path($path)->spew( $self->{_encoder}->encode($data) );
+    return -f $path;
+}
+
+# -----------------------------------------------------------------------------
+# _fetch
+# we add on the we use the encoder name as
+# a file extension to make sure we can have multiple formats in one tree
+sub _fetch
+{
+    my $self = shift;
+    my ($path) = @_;
+    $path .= ".$self->{encoder}" if ( $path !~ /\.$self->{encoder}$/ );
+    return $self->{_decoder}->decode( path($path)->slurp );
+}
 
 # -----------------------------------------------------------------------------
 
 # this is where we will initialise _handler with the object that will perform the
 # actual data storage functions
 
-sub BUILD {
+sub BUILD
+{
     my $self = shift;
 
     my ($mname) = ( __PACKAGE__ =~ /App::Basis::Data::(.*)/ );
@@ -98,6 +126,26 @@ sub BUILD {
     die "__PACKAGE__ expects a $mname:// sri" if ( !$module );
 
     die "Cannot build a datastore as sri points to a file" if ( -f $dir );
+
+    $self->{encoder} = lc( $self->{encoder} );
+
+    if ( $self->{encoder} eq 'json' ) {
+        require JSON;
+        $self->{_encoder} = JSON->new->allow_nonref;
+        $self->{_decoder} = JSON->new->allow_nonref;
+    }
+    elsif ( $self->{encoder} eq 'sereal' ) {
+        require Sereal;
+        $self->{_encoder} = Sereal::Encoder->new();
+        $self->{_decoder} = Sereal::Decoder->new();
+    }
+    elsif ( $self->{encoder} eq 'msgpack' ) {
+        require MsgPack;
+        die "msgpack does not provide encode/decode methods";
+    }
+    else {
+        die "Unknown encoder required: $self->{encoder}";
+    }
 
     try {
         path($dir)->mkpath;    # will die if any issues
@@ -114,12 +162,12 @@ sub BUILD {
 
 # -----------------------------------------------------------------------------
 # load in and decode the settings
-sub _get_settings {
+sub _get_settings
+{
     my $self = shift;
-    my $path = $self->{_dir} . '/settings';
 
     try {
-        $self->{_settings} = $self->{_decoder}->decode( path($path)->slurp );
+        $self->{_settings} = $self->_fetch( $self->{_dir} . '/settings' );
     }
     catch {
         # store the defaults
@@ -129,19 +177,20 @@ sub _get_settings {
 
 # -----------------------------------------------------------------------------
 # encode and store the settings
-sub _store_settings {
+sub _store_settings
+{
     my $self = shift;
 
     # set defaults if needed
     $self->{_settings} ||= { next_id => '0' };
-    say STDERR "dir " . $self->{_dir};
-    path( $self->{_dir} . '/settings' )->spew( $self->{_encoder}->encode( $self->{_settings} ) );
+    $self->_store( $self->{_dir} . '/settings', $self->{_settings} );
 }
 
 # -----------------------------------------------------------------------------
 # next_id is stored in the settings, this means that settings will be
 # reloaded the next_id value updated and saved again
-sub _next_id {
+sub _next_id
+{
     my $self = shift;
 
     # reload settings and adjust, not quite atomic but fine for simple use
@@ -156,7 +205,8 @@ sub _next_id {
 # we keep things in directories with up to 100 (00..99) items per directory, with 4 levels
 # of directory, should allow us to have 100^4 entries in the store!
 # we will make
-sub _build_path {
+sub _build_path
+{
     my $self = shift;
     my ( $id, $tag ) = @_;
     $tag ||= 'default';
@@ -171,7 +221,8 @@ sub _build_path {
 
 # -----------------------------------------------------------------------------
 # find the path for a given ID
-sub _find_path {
+sub _find_path
+{
     my $self = shift;
     my ($id) = @_;
     my $path;
@@ -185,20 +236,9 @@ sub _find_path {
 }
 
 # -----------------------------------------------------------------------------
-# add and update both use this
-sub _store {
-    my $self = shift;
-    my ( $path, $data ) = @_;
-
-    # make the directory for the file to live in
-    path( path($path)->dirname )->mkpath;    # will die if any issues
-    path($path)->spew( $self->{_encoder}->encode($data) );
-    return -f $path;
-}
-
-# -----------------------------------------------------------------------------
 # store the passed data as is
-sub add {
+sub add
+{
     my $self = shift;
     my ( $tag, $params ) = @_;
     my $id;
@@ -226,7 +266,8 @@ sub add {
 
 # -----------------------------------------------------------------------------
 # get the list of all the tags used
-sub taglist {
+sub taglist
+{
     my $self = shift;
     my @dirs;
 
@@ -239,7 +280,8 @@ sub taglist {
 
 # -----------------------------------------------------------------------------
 #  only with uniq ID
-sub delete {
+sub delete
+{
     my $self = shift;
     my ($id) = @_;
 
@@ -247,6 +289,7 @@ sub delete {
     if ($path) {
         unlink $path;
     }
+    return -f $path ;
 }
 
 # -----------------------------------------------------------------------------
@@ -256,9 +299,12 @@ sub delete {
 # match 'regexp', '='. 'like', '>=' etc
 # optional from/to timestamp
 # optional count
-sub tagsearch {
+sub tagsearch
+{
     my $self = shift;
     my ( $tag, $params ) = @_;
+
+    return undef;
 }
 
 # -----------------------------------------------------------------------------
@@ -267,38 +313,69 @@ sub tagsearch {
 # match 'regexp', '='. 'like', '>=' etc
 # optional from/to timestamp
 # optional count
-sub wildsearch {
+sub wildsearch
+{
     my $self = shift;
+
+    return undef;
 }
 
 # -----------------------------------------------------------------------------
 # Matches the tagsearch and wildsearch, but just returns the number of matching items
 # not the items themselves
-sub tagcount {
+sub tagcount
+{
     my $self = shift;
     my ( $tag, $params ) = @_;
+
+    my $from = $params->{from} || 0;
+    my $to = $params->{to} || 0xffffffff;    # end of epoch
+          # find all the files in the dir, check they are the right encoding
+          # get the data, check the from/to against timestamp
+
+    my $iter = path( $self->{_dir} . "/$tag/data" )->iterator(
+        {   recurse         => 1,
+            follow_symlinks => 0,
+        }
+    );
+
+    my $count = 0;
+    while ( my $path = $iter->() ) {
+        # we only want the files for our encoding
+        next if ( !$path->is_file || $path->stringify !~ /\.$self->{encoder}/ );
+        my $data = $self->_fetch( $path->stringify );
+        if ( $data && $data->{_timestamp} >= $from && $data->{_timestamp} <= $to ) {
+            $count++;
+        }
+    }
+
+    return $count;
 }
 
-sub wildcount {
+sub wildcount
+{
     my $self = shift;
 
+    return undef;
 }
 
 # -----------------------------------------------------------------------------
 # get data for a single uniq ID
-sub data {
+sub data
+{
     my $self = shift;
     my ($id) = @_;
 
-    return undef if( !$id) ;
+    return undef if ( !$id );
     my $path = $self->_find_path($id);
 
-    return $self->{_decoder}->decode( path($path)->slurp );
+    return $self->_fetch( path($path) );
 }
 
 # -----------------------------------------------------------------------------
 # update the data referenced (will add if no uniq ID)
-sub update {
+sub update
+{
     my $self = shift;
     my ($params) = @_;
 
@@ -309,6 +386,47 @@ sub update {
     return 0 if ( !$path );
 
     return $self->_store( $path, $params );
+}
+
+# -----------------------------------------------------------------------------
+# search
+# general purpose search
+# my $data = $store->search(
+#     {
+#         _tag => { 'eq' => 'fred'},
+#         _timestamp = { '>=' => '2013-01-01 12:00:00', '<=' => 'yesterday'},
+#         thing2 => { 'regexp' => '/a/'},
+#     }
+# ) ;
+# count only is a special flag so that we don't have too much cutnpaste code
+# generally search has to iterate over every single entry to make the matches
+# unless the hidden 'tag' is set
+
+sub search
+{
+    my $self = shift;
+    my ( $params, $tag, $count_only ) = @_;
+    my $results;
+    my $count ;
+    $tag ||= '' ;
+
+    my $iter = path( $self->{_dir} . "/$tag/data" )->iterator(
+        {   recurse         => 1,
+            follow_symlinks => 0,
+        }
+    );
+
+    while ( my $path = $iter->() ) {
+        # we only want the files for our encoding
+        next if ( !$path->is_file || $path->stringify !~ /\.$self->{encoder}/ );
+        my $data = $self->_fetch( $path->stringify );
+        if ( $data && $data->{_timestamp} >= $from && $data->{_timestamp} <= $to ) {
+            $count++;
+        }
+    }
+
+
+    return $results;
 }
 
 # -----------------------------------------------------------------------------
