@@ -66,3 +66,10 @@ update an entry (will add if no uniq ID)
 
 ### search
 
+from/to
+tag, or '*'
+(optional) count
+- all items must match
+fieldname => { 'regexp' => '/*/, '>=' => 123, 'gte' => 'fred' } 
+'*' => { 'regexp' => '/fred/'}
+'_*' => 

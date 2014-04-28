@@ -4,7 +4,6 @@
 
 # (c) kevin Mulholland 2014, moodfarm@cpan.org
 # this code is released under the Perl Artistic License
-# extra info at http://support.torch.sh/help/kb/graylog2-server/using-the-gelf-http-input
 
 use 5.10.0;
 use strict;
@@ -14,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 16;
+use Test::More tests => 20;
 
 BEGIN { use_ok('App::Basis::Data'); }
 
@@ -67,6 +66,7 @@ catch {};
 ok( !$id, 'cannot add an arrayref' );
 
 $id = $store->add( 'fred', $data );
+
 # note("id is $id");
 ok( $id, 'Added data to the store' );
 my @f = $store->taglist;
@@ -92,8 +92,7 @@ ok( $update_id != $id, "Update added new record" );
 
 $store->add( 'bill', $data );
 @f = sort $store->taglist;
-ok( scalar(@f) == 2 && $f[0] eq 'bill' && $f[1] eq 'fred',
-    'Taglist is good for 2 items' );
+ok( scalar(@f) == 2 && $f[0] eq 'bill' && $f[1] eq 'fred', 'Taglist is good for 2 items' );
 
 # give the data a timestamp
 $data->{timestamp} = '2013-01-01 12:00:00';
@@ -102,31 +101,38 @@ $store->add( 'bill', $data );
 # we now have 2 things in 'bill' one in 2013 and one this year
 
 # next up tagcount, count everything
-my $count = $store->tagcount('bill');
+my $count = $store->count( { _tag => { 'eq' => 'bill' } } );
 ok( $count == 2, '2 bill items' );
 
 # count all in 2013
-$count = $store->tagcount(
-    'bill',
-    {   from => '2013-01-01 00:00:00',
-        to   => '2013-12-31 23:59:59'
-    }
+$count = $store->count(
+    {   _tag       => { 'eq'       => 'bill' },
+        _timestamp => { 'date:gte' => '2013-01-01 00:00:00', 'date:lte' => '2013-12-31 23:59:59' },
+    },
 );
 ok( $count == 1, '1 bill in 2013' );
 
-$data = $store->search(
-    {   _tag         => { 'eq'     => 'fred' },
-        '_timestamp' => { '>='     => '2013-01-01 12:00:00', '<=' => 'yesterday' },
-        thing2       => { 'regexp' => '/a/' },
-    }
-);
+# we need to add some data that we can search for, change the date to 2000, to ensure we do not clash
+# with previous data
 
+$store->add( 'test_search',  { timestamp => '2000-02-01 12:00:00', message => 'testing 123',          counter => 100 } );
+$store->add( 'test_search',  { timestamp => '2000-03-01 12:00:00', message => 'Testing, testing 123', counter => 120 } );
+$store->add( 'test_search2', { timestamp => '2000-04-01 12:00:00', message => 'hello world',          counter => 140 } );
 
-# wildcount
+$data = $store->search( { _tag => { 'eq' => 'test_search' }, } );
+ok( scalar(@$data) == 2, 'search on tags only' );
 
-# now tagsearch and wildsearch
+$data = $store->search( { _timestamp => { 'date:gte' => '2000-01-01 12:00:00', 'date:lte' => '2000-03-30 12:00:00' }, } );
+ok( scalar(@$data) == 2, 'search on dates only' );
 
-# path( $store_dir)->remove_tree ;
+$data = $store->search( { message => { '~' => '^hello' } } );
+ok( scalar(@$data) == 1, 'regexp search only hello' );
+
+$data = $store->search( { message => { '!~' => 'hello' } } );
+ok( scalar(@$data) == 2, 'regexp search not hello' );
+
+# clean up things
+path($store_dir)->remove_tree;
 
 # -----------------------------------------------------------------------------
 # all done

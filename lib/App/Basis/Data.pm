@@ -11,9 +11,8 @@ App::Basis::Data
   my $store = App::Basis::Data->new( sri => 'file:///tmp/fred' ) ;
 
   my $id = $store->add( 'test', {message => 'testing', level => 'debug', counter => 20}) ;
-  my $test_data = $store->tagsearch( 'test', {from => '2014-01-01'}) ;
-  my $large_count_data = $store->wildsearch( counter => { 'gte' => 100} ) ; # or '>='
-  my $test_count = $store->tagcount('test') ;
+  my $large_count_data = $store->wildsearch( counter => { 'gte' => 100} ) ; # or '>=' for numbers
+  my $test_count = $store->count( {_tag => { 'eq' => 'test'}) ;
   my $data = $store->data( $id) ;
   $data->{counter} = 50 ;
   my $new_id = $store->update( $data) ;
@@ -21,7 +20,14 @@ App::Basis::Data
   $store->delete( $id) ;
 
 =head1 DESCRIPTION
- 
+
+
+=head1 Todo
+
+Decide if we need block operations, ie multiple deletes or a purge operation,
+possible that it could run a callback for every match of a search, but then
+it may get complex for some data storage types. for the moment I do not envisage 
+that I will need it, data is generally appended to the store and not removed
 
 =head1 AUTHOR
 
@@ -89,12 +95,11 @@ has _module   => ( is => 'ro', init_arg => undef, default => sub { } );
 # situations
 has _datemanip => ( is => 'ro', init_arg => undef, default => sub { Date::Manip::Date->new() } );
 
-
 # -----------------------------------------------------------------------------
 # remove leading and trailing spaces
 sub _trim {
     my ($str) = @_;
-    return if( !$str) ;
+    return if ( !$str );
 
     $str =~ s/^\s+//gsm;
     $str =~ s/\s+$//gsm;
@@ -128,7 +133,7 @@ sub BUILD {
     my %params = ( sri => $self->sri );
     foreach my $s ( split( ';', $self->sri ) ) {
         my ( $k, $v ) = ( $s =~ /^(.*)=(.*)/ );
-        last if( !$k) ;
+        last if ( !$k );
         $k = _trim($k);
         $params{$k} = _trim($v);
     }
@@ -165,6 +170,8 @@ sub _as_timestamp {
         $timestamp = $datestr;
     }
 
+    # make it a consistent timestamp str
+    # $timestamp = strftime( '%Y-%m-%d %H:%M:%S', gmtime( $timestamp ) ) ;
     return $timestamp;
 }
 
@@ -219,8 +226,8 @@ list all the tags that have been used to tag data
 
 sub taglist {
     my $self = shift;
-    my ( $tag ) = @_;
-    $self->{_handler}->taglist( $tag );
+    my ($tag) = @_;
+    $self->{_handler}->taglist($tag);
 }
 
 # -----------------------------------------------------------------------------
@@ -239,127 +246,9 @@ B<Parameters>
 =cut
 
 sub delete {
-    my $self   = shift;
+    my $self = shift;
     my ($id) = @_;
     $self->{_handler}->delete($id);
-}
-
-# -----------------------------------------------------------------------------
-# search for entries matching a single tag
-
-=item add 
-
-Add a new data item to the store
-
-    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
-    my $id = $store->add( thing1 => 123, thing2 => 'abc') ;
-
-B<Parameters>
-  hash of data to store
-  timestamp will override automatic timestamp
-  source 
-  
-=cut
-
-
-# tagname
-# match 'regexp', '='. 'like', '>=' etc
-# optional from/to timestamp
-# optional count
-sub tagsearch {
-    my $self = shift;
-    my ( $tag, $params ) = @_;
-    $params->{from} = $self->_as_timestamp( $params->{from} );
-    $params->{to}   = $self->_as_timestamp( $params->{to} );
-
-    $self->{_handler}->tagsearch( $tag, $params );
-}
-
-# -----------------------------------------------------------------------------
-# search all entries to match some data
-
-=item add 
-
-Add a new data item to the store
-
-    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
-    my $id = $store->add( thing1 => 123, thing2 => 'abc') ;
-
-B<Parameters>
-  hash of data to store
-  timestamp will override automatic timestamp
-  source 
-  
-=cut
-
-
-# match 'regexp', '='. 'like', '>=' etc
-# optional from/to timestamp
-# optional count
-sub wildsearch {
-    my $self   = shift;
-    my $params = @_;
-    die "wildsearch requires a hashref" if ( ref($params) ne 'HASH' );
-    $params->{from} = $self->_as_timestamp( $params->{from} );
-    $params->{to}   = $self->_as_timestamp( $params->{to} );
-
-    $self->{_handler}->wildsearch($params);
-}
-
-# -----------------------------------------------------------------------------
-# Matches the tagsearch and wildsearch, but just returns the number of matching items
-# not the items themselves
-# optional from/to timestamp
-
-=item add 
-
-Add a new data item to the store
-
-    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
-    my $id = $store->add( thing1 => 123, thing2 => 'abc') ;
-
-B<Parameters>
-  hash of data to store
-  timestamp will override automatic timestamp
-  source 
-  
-=cut
-
-sub tagcount {
-    my $self = shift;
-    my ( $tag, $params ) = @_;
-    die "tagcount requires a hashref" if ( ref($params) ne 'HASH' );
-    $params->{from} = $self->_as_timestamp( $params->{from} );
-    $params->{to}   = $self->_as_timestamp( $params->{to} );
-
-    $self->{_handler}->tagcount( $tag, $params );
-}
-
-# -----------------------------------------------------------------------------
-# optional from/to timestamp
-
-=item add 
-
-Add a new data item to the store
-
-    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
-    my $id = $store->add( thing1 => 123, thing2 => 'abc') ;
-
-B<Parameters>
-  hashref of data to store
-  timestamp will override automatic timestamp
-  source 
-  
-=cut
-
-sub wildcount {
-    my $self   = shift;
-    my $params = @_;
-    die "wildcount requires a hashref" if ( ref($params) ne 'HASH' );
-    $params->{from} = $self->_as_timestamp( $params->{from} );
-    $params->{to}   = $self->_as_timestamp( $params->{to} );
-
-    $self->{_handler}->wildcount($params);
 }
 
 # -----------------------------------------------------------------------------
@@ -410,14 +299,14 @@ B<Returns>
 =cut
 
 sub update {
-    my $self     = shift;
+    my $self = shift;
     my ($params) = @_;
     die "update requires a hashref" if ( ref($params) ne 'HASH' );
-    my $id       = $params->{_id};
-    my $current  = $self->data($id);
+    my $id      = $params->{_id};
+    my $current = $self->data($id);
 
     # basic check to see if its the same
-    if ($current && $current->{_uuid} eq $params->{_uuid}) {
+    if ( $current && $current->{_uuid} eq $params->{_uuid} ) {
         $params->{_modified} = time();
 
         # remove any parameters that are prefixed '_'
@@ -446,12 +335,27 @@ This is the general purpose search
 
     my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
     my $data = $store->search( 
-        { 
+        match => { 
             _tag => { 'eq' => 'fred'},
             _timestamp = { '>=' => '2013-01-01 12:00:00', '<=' => 'yesterday'},
-            thing2 => { 'regexp' => '/a/'},
+            thing2 => { '~' => 'a'},
         }
+        fields => [ qw( timestamp id source message)],
+        count => 0,   # default
     ) ;
+
+Fields is a list of matching fields to be returned, if a matching data item does not
+have this field, then this will be undef/missing
+Can return count of matching items if count is non-zero, in whch case fields is ignored
+
+valid comparisons are 
+    numbers: >= > = != =<     (=> same as <=, <= same as =<)
+    strings: gte gt eq ne lt lte      (ge same as gte, le same as lte)
+    time: prefix string compare with 'time:', i.e. time:eq, 
+    date: prefix string compare with 'date:', i.e. date:eq (date:after same as date:gt, date:before same as date:lt)
+    there are no :ne comparisons for date or time
+    regular expressions: ~ and !~ 
+    see L<App::Basis::Data::Compare> for more infomation.
 
 B<Parameters>
   hashref of things to search against
@@ -461,22 +365,41 @@ B<Returns>
   
 =cut
 
+# implementation note: the handler version of this method should only grab the matching tag items
+# and match against any underscore prefixed item, then return the items here so that the more
+# complex search can be done in one place and consistently
 
 sub search {
-    my $self = shift ;
-    my ($params) = @_ ;
+    my $self = shift;
+    my ($params) = @_;
     die "search requires a hashref" if ( ref($params) ne 'HASH' );
 
-   if( $params->{_timestamp}) {
-        # convert the times into proper epochs
-        foreach my $k ( keys %$params->{_timestamp}) {
-            $params->{_timestamp}->{$k} = $self->_as_timestamp( $params->{_timestamp}->{$k}) ;
-        }
-        
-    }
+    my $items = $self->{_handler}->search($params);
+}
 
+# -----------------------------------------------------------------------------
 
-    $self->{_handler}->search( $params);
+=item count
+
+Count the number of items with the tag, parameters are optional
+
+    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
+    my $items = $store->count( {  
+         _tag       => { 'eq'       => 'bill' },
+        _timestamp => { 'date:gte' => '2013-01-01 00:00:00', 'date:lte' => '2013-12-31 23:59:59' },
+    }) ;
+
+B<Parameters>
+  search terms used to count up
+  
+=cut
+
+sub count {
+    my $self = shift;
+    my ( $rules ) = @_;
+    die "count requires a hashref" if ( $rules && ref($rules) ne 'HASH' );
+
+    $self->{_handler}->count( $rules );
 }
 
 # -----------------------------------------------------------------------------
