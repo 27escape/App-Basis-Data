@@ -260,9 +260,12 @@ Remove a data item from the store
     my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
     my $id = $store->add( thing1 => 123, thing2 => 'abc') ;
     $store->delete( $id) ;
+    # alternatively
+    my $data = $store->($id) ;
+    $store->delete( $data) ;
 
 B<Parameters>
-    id
+    id or data item
 
 =cut
 
@@ -295,7 +298,7 @@ B<Returns>
 sub data {
     my $self = shift;
     my ($id) = @_;
-    
+
     # we may get passed the full data item
     $id = $id->{_id} if ( ref($id) eq 'HASH' );
 
