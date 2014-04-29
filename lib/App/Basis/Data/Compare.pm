@@ -77,7 +77,7 @@ sub _as_datestr {
     my ($date) = @_;
     my $datestr;
 
-    return if ( ! defined $date );
+    return if ( !defined $date );
 
     # we may have to convert the timestamp
     if ( !$date || $date =~ /^\d+$/ ) {
@@ -202,6 +202,8 @@ B<Returns>
 
 =cut
 
+my %_bad_refs = ( ARRAY => 1, HASH => 1, CODE => 1, REF => 1, GLOB => 1, LVALUE => 1, FORMAT => 1, IO => 1, VSTRING => 1, Regexp => 1 );
+
 sub compare {
     my ( $data, $rules, $sloppy ) = @_;
     my $result     = 1;
@@ -224,6 +226,13 @@ sub compare {
         else {
             # if we are being sloppy we need to
             $data->{$field} //= "" if ($sloppy);
+
+            # test against references we do not want to handle
+            if ( $_bad_refs{ ref( $data->{$field} ) } ) {
+                warn "Attempt to search using a complex data item ($field)";
+                $result = 0;
+                last;
+            }
 
             foreach my $cmp ( keys %{ $rules->{$field} } ) {
 

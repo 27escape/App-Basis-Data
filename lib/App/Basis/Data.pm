@@ -21,14 +21,35 @@ App::Basis::Data
 
 =head1 DESCRIPTION
 
+I needed a way to store semi-structured data to a number of systems, DB, redis, file.
+This module scratches this itch, it is not intended to be fast or efficient, just useful to me.
+
+With this I can store and search for data in a consistent way irrespective of the system
+that the data is store to. Document based stores can just store the data
+
+I do not expect (at the moment) that the data is multi-level, for me a data item is a group of
+key-values
+
+    item
+    fred    => 'bill' ,
+    counter => 12,
+    source  => 'localhost'
+
+This will not work 
+
+    fred    => 'bill' ,
+    counter => 12,
+    source  => 'localhost',
+    array   => [ 1,2,3,4],
+    hash    => { alf => 'alien', friend => 'mork'}
+
+well it will, it can be stored/retrieved, but we can only search scalar keys and values.
 
 =head1 Todo
 
-block operations, multiple deletes/purge
-callback on search to allow other things to happen, ie multiple add or field changes
-The handler library should decide how to do these, either multiple calls to update
-or if it can roll it into some query, callbacks have to be on each matching data item
-so costly in time terms
+DBI, Redis, Mongo datastore modules still need to be written
+
+Consider adding L<Net::Graylog::Client> as a datastore
 
 =head1 AUTHOR
 

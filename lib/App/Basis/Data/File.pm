@@ -240,12 +240,16 @@ sub add {
     my $path;
 
     # lets give ourselves a few chances to create the ID if another process
-    # has created it just before use
+    # has created it just before us
     while (1) {
         $id = $self->_next_id();
         $path = $self->_build_path( $id, $tag );
         if ( !-f $path ) {
             last;
+        }
+        # skip ID forwards up to 4 steps, + 1 for next time into loop = 5
+        foreach( 0 .. int(rand( 3))) {
+            $id = $self->_next_id();
         }
     }
 

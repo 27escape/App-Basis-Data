@@ -1,3 +1,6 @@
+0.3 2014-04-29
+  * File based data storage completed with tests
+  * new Compare module
 0.2 2014-04-11
   * update release, not ready yet
 0.1 2014-04-08

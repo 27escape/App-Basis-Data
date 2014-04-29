@@ -13,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 23;
+use Test::More tests => 30;
 
 BEGIN { use_ok('App::Basis::Data'); }
 
@@ -141,6 +141,34 @@ ok( $del == 1, 'purge deleted a single item' );
 
 my $left = $store->count();
 ok( ($left + 1) == $count, 'double check single delete' );
+
+$del = $store->purge( ) ;
+ok( $del == 6, 'purge deleted 6 items' );
+$count = $store->count();
+ok( $count == 0, 'purge emptied the datastore' );
+
+$data = {
+    pid    => $$,
+    time   => time,
+    field2 => 12345,
+    array  => [ 1, 2, 3, 4],
+    hash   => { alf => 'alien', friend => 'mork'},
+};
+
+$id = $store->add( 'complex', $data) ;
+ok( $id, 'stored complex' );
+$data2 = $store->data($id);
+# this is fine as it seems to ignore the fields prefixed '_'
+is_deeply( $data, $data2, 'retrieved complex data is correct' );
+
+$data = $store->search( { _tag => { 'eq' => 'complex' } } );
+ok( scalar(@$data) == 1, 'found complex' );
+
+$data = $store->search( { _tag => { 'eq' => 'complex' }, array => 1 } );
+ok( scalar(@$data) == 0, 'cannot search on complex key' );
+
+$data = $store->search( { _tag => { 'eq' => 'complex' }, array => 1 }, 1 );
+ok( scalar(@$data) == 0, 'cannot sloppy search on complex key' );
 
 # clean up things
 path($store_dir)->remove_tree;
