@@ -68,7 +68,7 @@ use vars qw( @EXPORT @ISA);
 # -----------------------------------------------------------------------------
 
 my $time_regexp = '(\d{2}:\d{2}(:\d{2})?)';
-my $date_regexp = '(\d{4}-\d{2}-\d{2}[\sT](\d{2}:\d{2}(:\d{2})?)?)';
+my $date_regexp = '(\d{4}-\d{2}-\d{2}([ T](\d{2}:\d{2}(:\d{2})?)?)?)';
 
 # -----------------------------------------------------------------------------
 sub _as_datestr {
@@ -77,10 +77,10 @@ sub _as_datestr {
     my ($date) = @_;
     my $datestr;
 
-    return if ( !$date );
+    return if ( ! defined $date );
 
     # we may have to convert the timestamp
-    if ( $date =~ /^\d+$/ ) {
+    if ( !$date || $date =~ /^\d+$/ ) {
         $datestr = strftime( '%Y-%m-%d %H:%M:%S', gmtime($date) );
     }
     else {
@@ -204,10 +204,12 @@ B<Returns>
 
 sub compare {
     my ( $data, $rules, $sloppy ) = @_;
-    my $result  = 1;
-    my $matched = 0;
+    my $result     = 1;
+    my $matched    = 0;
+    my $rule_count = 0;
 
     foreach my $field ( keys %{$rules} ) {
+        $rule_count++;
         if ( !$data->{$field} ) {
 
             if ($sloppy) {
@@ -265,7 +267,7 @@ sub compare {
                 elsif ( $cmp eq 'lte' || $cmp eq 'le' ) {
                     $result = ( "" . $data->{$field} ) le( "" . $rules->{$field}->{$cmp} );
                 }
-                elsif ( $cmp eq '~' || $cmp eq '=~') {
+                elsif ( $cmp eq '~' || $cmp eq '=~' ) {
                     $result = ( "" . $data->{$field} ) =~ /$rules->{$field}->{$cmp}/i;
                 }
                 elsif ( $cmp eq '!~' ) {
@@ -314,8 +316,10 @@ sub compare {
                 else {
                     die "Unknown comparison $cmp";
                 }
+
                 # string compares may return '' rather than 0
                 $result = 0 if ( $result eq '' );
+                last if ( !$result && !$sloppy );
             }
 
             $matched += $result;
@@ -326,7 +330,12 @@ sub compare {
     }
 
     # even if we are sloppy we need to match at least a single rule
-    $result = 0 if ( !$matched && $sloppy );
+    if ($sloppy) {
+        $result = 0 if ( !$matched );
+    }
+    else {
+        $result = 0 if ( $matched && $matched != $rule_count );
+    }
     return $result;
 }
 

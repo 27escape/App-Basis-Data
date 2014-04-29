@@ -24,10 +24,11 @@ App::Basis::Data
 
 =head1 Todo
 
-Decide if we need block operations, ie multiple deletes or a purge operation,
-possible that it could run a callback for every match of a search, but then
-it may get complex for some data storage types. for the moment I do not envisage 
-that I will need it, data is generally appended to the store and not removed
+block operations, multiple deletes/purge
+callback on search to allow other things to happen, ie multiple add or field changes
+The handler library should decide how to do these, either multiple calls to update
+or if it can roll it into some query, callbacks have to be on each matching data item
+so costly in time terms
 
 =head1 AUTHOR
 
@@ -170,8 +171,6 @@ sub _as_timestamp {
         $timestamp = $datestr;
     }
 
-    # make it a consistent timestamp str
-    # $timestamp = strftime( '%Y-%m-%d %H:%M:%S', gmtime( $timestamp ) ) ;
     return $timestamp;
 }
 
@@ -381,7 +380,7 @@ sub search {
 
 =item count
 
-Count the number of items with the tag, parameters are optional
+Count the number of items that match a search
 
     my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
     my $items = $store->count( {  
@@ -390,7 +389,7 @@ Count the number of items with the tag, parameters are optional
     }) ;
 
 B<Parameters>
-  search terms used to count up
+  search terms to find items to count
   
 =cut
 
@@ -401,6 +400,37 @@ sub count {
 
     $self->{_handler}->count( $rules );
 }
+
+
+# -----------------------------------------------------------------------------
+
+=item purge items that match a search
+
+Count the number of items with the tag, parameters are optional
+
+    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
+    my $items = $store->purge( {  
+         _tag       => { 'eq'       => 'bill' },
+        _timestamp => { 'date:gte' => '2013-01-01 00:00:00', 'date:lte' => '2013-12-31 23:59:59' },
+    }) ;
+
+B<Parameters>
+    search terms to find items to purge
+  
+B<Returns>
+    Number of items deleted
+
+=cut
+
+sub purge {
+    my $self = shift;
+    my ( $rules ) = @_;
+    die "purge requires a hashref" if ( $rules && ref($rules) ne 'HASH' );
+
+
+    $self->{_handler}->purge( $rules );
+}
+
 
 # -----------------------------------------------------------------------------
 

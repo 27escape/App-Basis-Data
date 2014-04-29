@@ -13,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 20;
+use Test::More tests => 23;
 
 BEGIN { use_ok('App::Basis::Data'); }
 
@@ -79,6 +79,7 @@ is_deeply( $data, $data2, 'added data is correct' );
 $data2->{number} = 100;
 my $update_id = $store->update($data2);
 ok( $update_id == $id, "Updated without adding" );
+
 my $data3 = $store->data($id);
 ok( $data3->{_modified}, 'there is a modified field' );
 
@@ -91,6 +92,7 @@ $update_id = $store->update($data3);
 ok( $update_id != $id, "Update added new record" );
 
 $store->add( 'bill', $data );
+
 @f = sort $store->taglist;
 ok( scalar(@f) == 2 && $f[0] eq 'bill' && $f[1] eq 'fred', 'Taglist is good for 2 items' );
 
@@ -107,8 +109,8 @@ ok( $count == 2, '2 bill items' );
 # count all in 2013
 $count = $store->count(
     {   _tag       => { 'eq'       => 'bill' },
-        _timestamp => { 'date:gte' => '2013-01-01 00:00:00', 'date:lte' => '2013-12-31 23:59:59' },
-    },
+        _timestamp => { 'date:gte' => '2013-01-01', 'date:lte' => '2013-12-31' },
+    }
 );
 ok( $count == 1, '1 bill in 2013' );
 
@@ -130,6 +132,15 @@ ok( scalar(@$data) == 1, 'regexp search only hello' );
 
 $data = $store->search( { message => { '!~' => 'hello' } } );
 ok( scalar(@$data) == 2, 'regexp search not hello' );
+
+$count = $store->count();
+ok( $count > 0, 'raw count' );
+
+my $del = $store->purge( {counter => { '=' => 140}}) ;
+ok( $del == 1, 'purge deleted a single item' );
+
+my $left = $store->count();
+ok( ($left + 1) == $count, 'double check single delete' );
 
 # clean up things
 path($store_dir)->remove_tree;

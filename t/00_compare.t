@@ -13,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 40;
+use Test::More tests => 41;
 
 BEGIN { use_ok('App::Basis::Data::Compare'); }
 
@@ -75,6 +75,8 @@ ok( compare( { timestamp => '2013-02-01 12:00:00', extra => 'fred'}, { timestamp
 
 # compare against actual unix timestamp
 ok( compare( { timestamp => time(), extra => 'fred'}, { timestamp => { 'date:gte' => '1980-01-01 12:00:00', 'date:lte' => '2038-01-01 12:00:00' }} ) == 1, 'complex: timestamp dates between') ;
+
+ok( compare( { timestamp => 1398695647}, { timestamp => { 'date:gte' => '2013-01-01', 'date:lte' => '2013-12-31' }} ) == 0, 'complex: timestamp dates not between') ;
 
 # -----------------------------------------------------------------------------
 # all done

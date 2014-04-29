@@ -222,7 +222,9 @@ sub _find_path {
     my $path;
 
     foreach my $tag ( $self->taglist() ) {
-        $path = $self->_build_path( $id, $tag );
+
+        # append the encoder we are using
+        $path = $self->_build_path( $id, $tag ) . "." . $self->{encoder};
         last if ( -f $path );
     }
 
@@ -276,11 +278,14 @@ sub delete {
     my $self = shift;
     my ($id) = @_;
 
+    # we may get passed the full data item
+    $id = $id->{_id} if ( ref($id) eq 'HASH' );
+
     my $path = $self->_find_path($id);
     if ($path) {
         unlink $path;
     }
-    return -f $path;
+    return -f $path ? 0 : 1;
 }
 
 # -----------------------------------------------------------------------------
@@ -342,6 +347,10 @@ sub search {
         # does it look like a file we should be processing?
         next if ( $path->stringify !~ m|$self->{_dir}/.*?/data/\d+?| );
         my $data = $self->_fetch( $path->stringify );
+
+        # if the data does not have one of our uuids then its not one of ours
+        next if ( !$data->{_uuid} );
+
         if ( compare( $data, $rules ) ) {
             if ($count_only) {
                 $count++;
@@ -364,8 +373,27 @@ sub count {
     my $self = shift;
     my ($rules) = @_;
 
+    # we need a minimum rule to allow searching to take place
+    if ( !$rules ) {
+        $rules = { _timestamp => { 'date:after' => 0 } };
+    }
+
     # use the special skip through in search to count the matches
-    return $self->search($rules, 1);
+    return $self->search( $rules, 1 );
+}
+
+# -----------------------------------------------------------------------------
+# Just remove the items
+sub purge {
+    my $self    = shift;
+    my ($rules) = @_;
+    my $count   = 0;
+
+    foreach my $item ( @{ $self->search($rules) } ) {
+        $count += $self->delete( $item->{_id} );
+    }
+
+    return $count;
 }
 
 # -----------------------------------------------------------------------------
