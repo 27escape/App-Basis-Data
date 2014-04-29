@@ -13,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 30;
+use Test::More tests => 36;
 
 BEGIN { use_ok('App::Basis::Data'); }
 
@@ -169,6 +169,32 @@ ok( scalar(@$data) == 0, 'cannot search on complex key' );
 
 $data = $store->search( { _tag => { 'eq' => 'complex' }, array => 1 }, 1 );
 ok( scalar(@$data) == 0, 'cannot sloppy search on complex key' );
+
+my $store2 = App::Basis::Data->new( sri => "file://$store_dir;encoder=sereal" );
+ok( $store2, 'We have a sereal store in same directory as JSON' );
+
+$count = $store2->count();
+ok( $count == 0, 'sereal: we do not count JSON stored data' );
+
+$data = $store2->search( { _tag => { 'eq' => 'complex' } } );
+ok( scalar(@$data) == 0, 'sereal: we do not find JSON stored data' );
+
+$data = {
+    pid    => $$,
+    time   => time,
+    field2 => 12345,
+    array  => [ 1, 2, 3, 4],
+    hash   => { alf => 'alien', friend => 'mork'},
+};
+
+$id = $store2->add( 'complex', $data) ;
+ok( $id, 'sereal: stored complex' );
+$data2 = $store2->data($id);
+# this is fine as it seems to ignore the fields prefixed '_'
+is_deeply( $data, $data2, 'sereal: retrieved complex data is correct' );
+
+$data = $store2->search( { _tag => { 'eq' => 'complex' } } );
+ok( scalar(@$data) == 1, 'sereal: we find stored data' );
 
 # clean up things
 path($store_dir)->remove_tree;

@@ -1,3 +1,6 @@
+0.4 2014-04-29
+  * Fix handling of encoder in sri
+  * add tests for sereal encoder
 0.3 2014-04-29
   * File based data storage completed with tests
   * new Compare module

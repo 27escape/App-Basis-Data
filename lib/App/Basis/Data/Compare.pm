@@ -39,9 +39,7 @@ Time comparisons will extract HH:MM[:SS] from any string
 
 =head1 See Also
 
-
-=head1 Todo
-
+L<App::Basis::Data>
 
 =cut
 

@@ -21,22 +21,19 @@ App::Basis::Data::File
   $store->delete( $id) ;
 
 =head1 DESCRIPTION
- 
 
+This is a handler class for App::Basis::Data. 
+
+Store semi-structured data to files (JSON by default, sereal optional), allow full range
+of App::Basis::Data methods.
+ 
 =head1 AUTHOR
 
  kevin mulholland
 
-=head1 VERSIONS
-
-v0.1  2014/04/08, initial work
-
 =head1 Notes
 
 You should not use this class directly, it should be called via L<App::Basis::Data>
- 
-=head1 Todo
-
 
 =cut
 
@@ -137,11 +134,6 @@ sub BUILD {
         $self->{_encoder} = Sereal::Encoder->new();
         $self->{_decoder} = Sereal::Decoder->new();
     }
-
-    # elsif ( $self->{encoder} eq 'msgpack' ) {
-    #     require MsgPack;
-    #     die "msgpack does not provide encode/decode methods";
-    # }
     else {
         die "Unknown encoder required: $self->{encoder}";
     }
@@ -281,9 +273,6 @@ sub taglist {
 sub delete {
     my $self = shift;
     my ($id) = @_;
-
-    # we may get passed the full data item
-    $id = $id->{_id} if ( ref($id) eq 'HASH' );
 
     my $path = $self->_find_path($id);
     if ($path) {

@@ -150,14 +150,15 @@ sub BUILD {
     };
 
     # while each SQL DB understands its DBI format, this is not true of the redis/mongo DBs
-    # so lets als split out any component parts
+    # so lets also split out any component parts
 
     my %params = ( sri => $self->sri );
-    foreach my $s ( split( ';', $self->sri ) ) {
-        my ( $k, $v ) = ( $s =~ /^(.*)=(.*)/ );
-        last if ( !$k );
-        $k = _trim($k);
-        $params{$k} = _trim($v);
+    foreach my $s (split( ';', $self->sri )) {
+        my ( $k, $v ) = ( $s =~ /^(.*?)=(.*)/ );
+        if ( $k ) {
+            $k = _trim($k);
+            $params{$k} = _trim($v);
+        }
     }
 
     # and create the required class instance
@@ -268,6 +269,8 @@ B<Parameters>
 sub delete {
     my $self = shift;
     my ($id) = @_;
+    # we may get passed the full data item
+    $id = $id->{_id} if ( ref($id) eq 'HASH' );
     $self->{_handler}->delete($id);
 }
 
@@ -292,6 +295,9 @@ B<Returns>
 sub data {
     my $self = shift;
     my ($id) = @_;
+    
+    # we may get passed the full data item
+    $id = $id->{_id} if ( ref($id) eq 'HASH' );
 
     $self->{_handler}->data($id);
 }
@@ -348,7 +354,7 @@ sub update {
 
 # -----------------------------------------------------------------------------
 
-=item 
+=item search
 
 search for matching items
 This is the general purpose search
@@ -416,12 +422,11 @@ B<Parameters>
 
 sub count {
     my $self = shift;
-    my ( $rules ) = @_;
+    my ($rules) = @_;
     die "count requires a hashref" if ( $rules && ref($rules) ne 'HASH' );
 
-    $self->{_handler}->count( $rules );
+    $self->{_handler}->count($rules);
 }
-
 
 # -----------------------------------------------------------------------------
 
@@ -445,13 +450,11 @@ B<Returns>
 
 sub purge {
     my $self = shift;
-    my ( $rules ) = @_;
+    my ($rules) = @_;
     die "purge requires a hashref" if ( $rules && ref($rules) ne 'HASH' );
 
-
-    $self->{_handler}->purge( $rules );
+    $self->{_handler}->purge($rules);
 }
-
 
 # -----------------------------------------------------------------------------
 
