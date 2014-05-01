@@ -153,9 +153,9 @@ sub BUILD {
     # so lets also split out any component parts
 
     my %params = ( sri => $self->sri );
-    foreach my $s (split( ';', $self->sri )) {
+    foreach my $s ( split( ';', $self->sri ) ) {
         my ( $k, $v ) = ( $s =~ /^(.*?)=(.*)/ );
-        if ( $k ) {
+        if ($k) {
             $k = _trim($k);
             $params{$k} = _trim($v);
         }
@@ -272,6 +272,7 @@ B<Parameters>
 sub delete {
     my $self = shift;
     my ($id) = @_;
+
     # we may get passed the full data item
     $id = $id->{_id} if ( ref($id) eq 'HASH' );
     $self->{_handler}->delete($id);
@@ -364,18 +365,12 @@ This is the general purpose search
 
     my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
     my $data = $store->search( 
-        match => { 
+        { 
             _tag => { 'eq' => 'fred'},
             _timestamp = { '>=' => '2013-01-01 12:00:00', '<=' => 'yesterday'},
             thing2 => { '~' => 'a'},
         }
-        fields => [ qw( timestamp id source message)],
-        count => 0,   # default
     ) ;
-
-Fields is a list of matching fields to be returned, if a matching data item does not
-have this field, then this will be undef/missing
-Can return count of matching items if count is non-zero, in whch case fields is ignored
 
 valid comparisons are 
     numbers: >= > = != =<     (=> same as <=, <= same as =<)
@@ -403,6 +398,68 @@ sub search {
     my ($params) = @_;
     die "search requires a hashref" if ( ref($params) ne 'HASH' );
 
+    my $items = $self->{_handler}->search($params);
+}
+
+# -----------------------------------------------------------------------------
+
+=item ssearch
+
+search for matching items using strings
+This is the general purpose search
+
+    my $store = App::Basis::Data->new( sri => 'file:///tmp/store') ;
+    my $data = $store->ssearch( 
+            [
+            '_tag  eq fred',
+            '_timestamp >= 2013-01-01 12:00:00', 
+            '_timestamp <= 2014-01-01 12:00:00',
+            'thing2 ~ a',
+        ]
+    ) ;
+
+valid comparisons are 
+    numbers: >= > = != =<     (=> same as <=, <= same as =<)
+    strings: gte gt eq ne lt lte      (ge same as gte, le same as lte)
+    time: prefix string compare with 'time:', i.e. time:eq, 
+    date: prefix string compare with 'date:', i.e. date:eq (date:after same as date:gt, date:before same as date:lt)
+    there are no :ne comparisons for date or time
+    regular expressions: ~ and !~ 
+    see L<App::Basis::Data::Compare> for more infomation.
+
+B<Parameters>
+  hashref of things to search against
+
+B<Returns>
+  arrayref of matching items
+  
+=cut
+
+# implementation note: the handler version of this method should only grab the matching tag items
+# and match against any underscore prefixed item, then return the items here so that the more
+# complex search can be done in one place and consistently
+
+sub ssearch {
+    my $self = shift;
+    my ($strings) = @_;
+    die "ssearch requires an arrayref" if ( ref($strings) ne 'ARRAY' );
+
+    my $params;
+
+    # build up the standard search
+    foreach my $s ( @{$strings} ) {
+        my ( $field, $op, $cmp ) = ( $s =~ /^(\w+)\s+(.*?)\s+(.*)/ );
+        next if ( !$field );
+
+        if ( $params->{$field} ) {
+            $params->{$field}->{$op} = $cmp;
+        }
+        else {
+            $params->{$field} = { $op => $cmp };
+        }
+    }
+
+    # and do the normal search
     my $items = $self->{_handler}->search($params);
 }
 

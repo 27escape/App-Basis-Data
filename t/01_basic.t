@@ -13,7 +13,7 @@ use Data::Printer;
 use App::Basis;
 use Try::Tiny;
 use Path::Tiny;
-use Test::More tests => 36;
+use Test::More tests => 37;
 
 BEGIN { use_ok('App::Basis::Data'); }
 
@@ -136,13 +136,16 @@ ok( scalar(@$data) == 2, 'regexp search not hello' );
 $count = $store->count();
 ok( $count > 0, 'raw count' );
 
-my $del = $store->purge( {counter => { '=' => 140}}) ;
+$data = $store->ssearch( [ '_timestamp date:gte 2000-01-01 12:00:00', '_timestamp date:lte 2000-03-30 12:00:00' ] );
+ok( scalar(@$data) == 2, 'string search on dates only' );
+
+my $del = $store->purge( { counter => { '=' => 140 } } );
 ok( $del == 1, 'purge deleted a single item' );
 
 my $left = $store->count();
-ok( ($left + 1) == $count, 'double check single delete' );
+ok( ( $left + 1 ) == $count, 'double check single delete' );
 
-$del = $store->purge( ) ;
+$del = $store->purge();
 ok( $del == 6, 'purge deleted 6 items' );
 $count = $store->count();
 ok( $count == 0, 'purge emptied the datastore' );
@@ -151,13 +154,14 @@ $data = {
     pid    => $$,
     time   => time,
     field2 => 12345,
-    array  => [ 1, 2, 3, 4],
-    hash   => { alf => 'alien', friend => 'mork'},
+    array  => [ 1, 2, 3, 4 ],
+    hash   => { alf => 'alien', friend => 'mork' },
 };
 
-$id = $store->add( 'complex', $data) ;
+$id = $store->add( 'complex', $data );
 ok( $id, 'stored complex' );
 $data2 = $store->data($id);
+
 # this is fine as it seems to ignore the fields prefixed '_'
 is_deeply( $data, $data2, 'retrieved complex data is correct' );
 
@@ -183,13 +187,14 @@ $data = {
     pid    => $$,
     time   => time,
     field2 => 12345,
-    array  => [ 1, 2, 3, 4],
-    hash   => { alf => 'alien', friend => 'mork'},
+    array  => [ 1, 2, 3, 4 ],
+    hash   => { alf => 'alien', friend => 'mork' },
 };
 
-$id = $store2->add( 'complex', $data) ;
+$id = $store2->add( 'complex', $data );
 ok( $id, 'sereal: stored complex' );
 $data2 = $store2->data($id);
+
 # this is fine as it seems to ignore the fields prefixed '_'
 is_deeply( $data, $data2, 'sereal: retrieved complex data is correct' );
 
