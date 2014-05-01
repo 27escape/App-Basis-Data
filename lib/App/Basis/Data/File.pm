@@ -117,6 +117,8 @@ sub BUILD {
     $mname = lc($mname);
 
     my ( $module, $dir ) = ( $self->sri =~ m|^($mname)://(.*)| );
+    # remove any potential extra arguments
+    $dir =~ s/;.*// ;
 
     die "__PACKAGE__ expects a $mname:// sri" if ( !$module );
 
