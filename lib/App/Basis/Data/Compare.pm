@@ -232,7 +232,9 @@ sub compare {
                 last;
             }
 
-            foreach my $cmp ( keys %{ $rules->{$field} } ) {
+            # working on the basis that things with special prefixes like '_'
+            # need to be searched before anything else
+            foreach my $cmp ( sort keys %{ $rules->{$field} } ) {
 
                 # we could do this as a function lookup, but as its simple, we
                 # will just have lots of if statements
